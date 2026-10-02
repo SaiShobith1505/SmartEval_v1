@@ -1,0 +1,46 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Build outputs
+dist/
+dist-electron/
+build/
+release/
+
+# Environment variables
+.env
+.env.*`n!.env.example
+
+# Logs
+logs
+*.log
+
+# Docker
+docker-compose.override.yml
+
+# Prisma generated client (keep schema files tracked)
+prisma/generated/*
+
+# Misc
+.DS_Store
+Thumbs.db
+
+# Flutter
+/frontend_flutter/.dart_tool/
+/frontend_flutter/.flutter-plugins
+/frontend_flutter/.flutter-plugins-dependencies
+/frontend_flutter/.packages
+/frontend_flutter/.pub/
+/frontend_flutter/build/
+
+# SmartEval runtime data
+/uploads/
+/storage/
+/tmp/
+/temp/
+/coverage/
+

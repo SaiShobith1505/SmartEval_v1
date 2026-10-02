@@ -1,0 +1,312 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Define the PostgreSQL datasource
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Define the generator for Prisma Client
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "postgresqlExtensions"]
+}
+
+// Define the models for the SmartEval system
+
+// Users and authentication
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  role          Role      @default(FACULTY)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  faculty       Faculty?
+
+  @@index([email])
+}
+
+// Faculty members
+model Faculty {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+  department  String
+  title       String
+  facultyReviews FacultyReview[]
+
+  @@index([userId])
+}
+
+// Examinations
+model Examination {
+  id          String       @id @default(cuid())
+  name        String
+  term        String
+  courseCode  String
+  status      ExaminationStatus @default(CREATED)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  questionPapers QuestionPaper[]
+  answerSheets   AnswerSheet[]
+
+  @@index([courseCode])
+}
+
+// Question Papers
+model QuestionPaper {
+  id              String    @id @default(cuid())
+  examinationId   String
+  examination     Examination @relation(fields: [examinationId], references: [id])
+  storageKey      String
+  extractedJson   Json
+  validatedBy     String?
+  validatedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  modelAnswers    ModelAnswer[]
+
+  @@index([examinationId])
+}
+
+// Model Answers
+model ModelAnswer {
+  id              String    @id @default(cuid())
+  questionPaperId String
+  questionPaper   QuestionPaper @relation(fields: [questionPaperId], references: [id])
+  storageKey      String
+  extractedJson   Json
+  validatedBy     String?
+  validatedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([questionPaperId])
+}
+
+// Answer Sheets
+model AnswerSheet {
+  id            String    @id @default(cuid())
+  studentId     String
+  examinationId String
+  examination   Examination @relation(fields: [examinationId], references: [id])
+  storageKey    String
+  uploadedAt    DateTime  @default(now())
+  status        AnswerSheetStatus @default(UPLOADED)
+  documentPages DocumentPage[]
+
+  @@index([examinationId])
+}
+
+// Document Pages
+model DocumentPage {
+  id            String    @id @default(cuid())
+  answerSheetId String
+  answerSheet   AnswerSheet @relation(fields: [answerSheetId], references: [id])
+  pageNumber    Int
+  storageKey    String
+  width         Int
+  height        Int
+  createdAt     DateTime  @default(now())
+  visionResults VisionResult[]
+
+  @@index([answerSheetId])
+  @@unique([answerSheetId, pageNumber])
+}
+
+// Vision Results
+model VisionResult {
+  id              String    @id @default(cuid())
+  documentPageId String
+  documentPage   DocumentPage @relation(fields: [documentPageId], references: [id])
+  rawVlmOutput   Json
+  processedRegions Json
+  createdAt       DateTime  @default(now())
+  questionMappings QuestionMapping[]
+
+  @@index([documentPageId])
+}
+
+// Question Mappings
+model QuestionMapping {
+  id              String    @id @default(cuid())
+  visionResultId String
+  visionResult   VisionResult @relation(fields: [visionResultId], references: [id])
+  questionNumber String
+  confidence      Float
+  boundingBox    Json
+  status          QuestionMappingStatus @default(MAPPED)
+  createdAt       DateTime  @default(now())
+  answerSegments AnswerSegment[]
+
+  @@index([visionResultId])
+}
+
+// Answer Segments
+model AnswerSegment {
+  id                String    @id @default(cuid())
+  questionMappingId String
+  questionMapping  QuestionMapping @relation(fields: [questionMappingId], references: [id])
+  textContent      String
+  bbox              Json
+  pageSequence     Int[]
+  versionId         Int       @default(1)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  aiEvaluations    AIEvaluation[]
+  facultyReviews   FacultyReview[]
+  finalMarks       FinalMark[]
+
+  @@index([questionMappingId])
+}
+
+// AI Evaluations
+model AIEvaluation {
+  id              String    @id @default(cuid())
+  answerSegmentId String
+  answerSegment   AnswerSegment @relation(fields: [answerSegmentId], references: [id])
+  modelUsed       String
+  promptVersion   String
+  suggestedMarks  Int
+  feedbackJson    Json
+  tokenUsage     Json
+  createdAt       DateTime  @default(now())
+  aiVerifications AIVerification[]
+
+  @@index([answerSegmentId])
+}
+
+// AI Verifications
+model AIVerification {
+  id              String    @id @default(cuid())
+  aiEvaluationId String
+  aiEvaluation   AIEvaluation @relation(fields: [aiEvaluationId], references: [id])
+  verificationResult Json
+  passedConstraints Json
+  feedback        String
+  createdAt       DateTime  @default(now())
+
+  @@index([aiEvaluationId])
+}
+
+// Faculty Reviews
+model FacultyReview {
+  id              String    @id @default(cuid())
+  answerSegmentId String
+  answerSegment   AnswerSegment @relation(fields: [answerSegmentId], references: [id])
+  facultyId       String
+  faculty         Faculty @relation(fields: [facultyId], references: [id])
+  reviewedMarks   Int?
+  remarks         String?
+  approvedAt      DateTime?
+  versionId       Int
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  finalMarks      FinalMark[]
+
+  @@index([answerSegmentId])
+  @@index([facultyId])
+}
+
+// Final Marks
+model FinalMark {
+  id              String    @id @default(cuid())
+  answerSegmentId String
+  answerSegment   AnswerSegment @relation(fields: [answerSegmentId], references: [id])
+  facultyReviewId String?
+  facultyReview   FacultyReview? @relation(fields: [facultyReviewId], references: [id])
+  aiSuggestedMarks Int
+  facultyMarks     Int?
+  finalMarks      Int
+  decidedBy       String
+  decidedAt       DateTime  @default(now())
+
+  @@index([answerSegmentId])
+  @@index([facultyReviewId])
+}
+
+// Audit Log
+model AuditLog {
+  id            String   @id @default(cuid())
+  entityType    String
+  entityId      String
+  action        String
+  performedBy   String
+  beforeJson    Json?
+  afterJson     Json?
+  timestamp     DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([timestamp])
+}
+
+// Jobs
+model Job {
+  id          String   @id @default(cuid())
+  queueName   String
+  payload     Json
+  status      JobStatus @default(WAITING)
+  attempts    Int      @default(0)
+  lastError   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([queueName])
+  @@index([status])
+}
+
+// Prompt Versions
+model PromptVersion {
+  id          String   @id @default(cuid())
+  name        String
+  version     String
+  template    String
+  variables   Json
+  active      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@unique([name, version])
+}
+
+// Enums
+enum Role {
+  SUPER_ADMIN
+  FACULTY
+}
+
+enum ExaminationStatus {
+  CREATED
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum AnswerSheetStatus {
+  UPLOADED
+  PROCESSING
+  FAILED
+  READY_FOR_REVIEW
+  REVIEWED
+  APPROVED
+  NOT_READY
+  MODEL_ANSWER_PENDING_VALIDATION
+}
+
+enum QuestionMappingStatus {
+  MAPPED
+  UNMAPPED_NEEDS_FACULTY_REVIEW
+  MAPPED_BY_FACULTY
+}
+
+enum JobStatus {
+  WAITING
+  ACTIVE
+  COMPLETED
+  FAILED
+}
+
